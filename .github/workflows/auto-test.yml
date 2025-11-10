@@ -76,6 +76,6 @@ jobs:
         run: |
           git config user.email "ai-test-bot@example.com"
           git config user.name "AI Test Bot"
-          git add src/test/java/com/example/demo/generated || true
+          git add src/test/java/generated || true
           git commit -m "✅ Auto-generated tests using OpenAI gpt-4o-mini" || true
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:main
