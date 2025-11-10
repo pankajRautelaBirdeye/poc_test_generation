@@ -45,7 +45,7 @@ jobs:
                 input: [
                   {
                     "role": "system",
-                    "content": "You generate ONLY clean JUnit5 test classes for Spring Boot @WebMvcTest controllers. Use @MockBean for dependencies, autowire ObjectMapper, include all imports, place class in package com.example.demo.generated. Output exactly one ```java code block."
+                    "content": "You generate ONLY clean JUnit5 test classes for Spring Boot @WebMvcTest controllers. Use @MockBean for dependencies, autowire ObjectMapper, include all imports, place class in package src.test.java,generated. Output exactly one ```java code block."
                   },
                   {
                     "role": "user",
