@@ -22,7 +22,7 @@ jobs:
         run: mvn -q -DskipTests package
 
       - name: Scan for annotated APIs
-        run: java -cp target/classes com.example.tools.ScanAnnotations > methods.json
+        run: java -cp target/classes com.example.poc_test_generation.tools > methods.json
 
       - name: Print detected APIs
         run: cat methods.json
@@ -37,7 +37,7 @@ jobs:
             > generated.json
 
       - name: Write generated test files (Java)
-        run: java -cp target/classes com.example.tools.WriteGeneratedTests
+        run: java -cp target/classes com.example.poc_test_generation.tools.WriteGeneratedTests
 
       - name: Commit & Push Generated Tests
         run: |
