@@ -12,12 +12,12 @@ jobs:
     steps:
 
       # ----------------------------------------------------
-      # 1. Checkout code
+      # 1. Checkout repository
       # ----------------------------------------------------
       - uses: actions/checkout@v4
 
       # ----------------------------------------------------
-      # 2. Setup Java 17
+      # 2. Setup Java (required for scanner + writer)
       # ----------------------------------------------------
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -26,19 +26,19 @@ jobs:
           distribution: 'temurin'
 
       # ----------------------------------------------------
-      # 3. Build project (scanner + writer classes)
+      # 3. Build project (scanner + writer)
       # ----------------------------------------------------
       - name: Build tools
         run: mvn -q -DskipTests package
 
       # ----------------------------------------------------
-      # 4. Build full Maven classpath for Jackson + JavaParser
+      # 4. Build full Maven classpath (Jackson + JavaParser)
       # ----------------------------------------------------
       - name: Build classpath
         run: mvn -q -DincludeScope=runtime dependency:build-classpath -Dmdep.outputFile=cp.txt
 
       # ----------------------------------------------------
-      # 5. Run scanner (JavaParser + Jackson) with full classpath
+      # 5. Run scanner with full classpath
       # ----------------------------------------------------
       - name: Scan project for annotated APIs
         run: |
@@ -46,39 +46,38 @@ jobs:
           java -cp "$CP" com.example.poc_test_generation.tools.ScanAnnotations
 
       - name: Print scanner output
-        run: cat methods.json
+        run: cat methods.json || echo "❌ methods.json missing"
 
       # ----------------------------------------------------
-      # 6. Call OpenAI for each annotated API
-      #    FIXED: safe JSON via jq --argjson
+      # 6. Call OpenAI for each scanned method
+      #    ✅ FIXED: safe JSON using --arg
       # ----------------------------------------------------
       - name: Generate Tests using OpenAI gpt-4o-mini
         run: |
           echo "[" > combined_output.json
 
           jq -c '.[]' methods.json | while read method; do
-            echo "Generating test for method: $method"
+            echo "📌 Generating test for method..."
 
-            # Build valid JSON request using jq
+            # Build valid JSON using jq (safe string)
             REQUEST=$(jq -n \
-              --argjson method "$method" \
+              --arg method "$method" \
               '{
                 model: "gpt-4o-mini",
                 input: [
                   {
                     "role": "system",
-                    "content": "You generate ONLY one JUnit5 test class. Return EXACTLY one ```java code block. Use @WebMvcTest, MockMvc, ObjectMapper, Mockito."
+                    "content": "You generate ONLY clean JUnit 5 test classes. Output exactly one ```java code block. Use @WebMvcTest, MockMvc, Mockito, and ObjectMapper."
                   },
                   {
                     "role": "user",
-                    "content": ("Generate complete Spring Boot JUnit tests for the following method:\n\n" + ($method | tostring))
+                    "content": ("Generate a complete Spring Boot JUnit test for the following method metadata:\n\n" + $method)
                   }
                 ],
                 max_output_tokens: 4096,
                 temperature: 0.2
               }')
 
-            # Call OpenAI
             RESPONSE=$(curl -s https://api.openai.com/v1/responses \
               -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
               -H "Content-Type: application/json" \
@@ -87,7 +86,6 @@ jobs:
             echo "$RESPONSE," >> combined_output.json
           done
 
-          # Remove trailing comma and close JSON array
           sed -i '$ s/,$//' combined_output.json
           echo "]" >> combined_output.json
 
@@ -103,7 +101,7 @@ jobs:
           java -cp "$CP" com.example.poc_test_generation.tools.WriteGeneratedTests
 
       # ----------------------------------------------------
-      # 8. Commit & push tests
+      # 8. Commit & Push generated test files
       # ----------------------------------------------------
       - name: Commit & Push Generated Tests
         run: |
