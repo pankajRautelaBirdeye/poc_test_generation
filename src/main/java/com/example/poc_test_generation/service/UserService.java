@@ -15,6 +15,6 @@ public class UserService {
     }
 
     public User getUser(Long id) {
-        return repo.findById(id).orElse(null);
+        return repo.findById(id);
     }
 }

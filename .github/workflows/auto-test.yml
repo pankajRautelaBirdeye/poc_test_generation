@@ -1,14 +1,48 @@
-name: Test GitHub Actions
+name: Auto Test Generation
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
-  test:
+  generate-tests:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Print Hello
-        run: echo "✅ GitHub Actions is working"
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build tools (scanner + writer)
+        run: mvn -q -DskipTests package
+
+      - name: Scan for annotated APIs
+        run: java -cp target/classes com.example.tools.ScanAnnotations > methods.json
+
+      - name: Print detected APIs
+        run: cat methods.json
+
+      - name: Call GitHub Copilot Test Generation API
+        run: |
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.GH_COPILOT_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d @methods.json \
+            https://api.github.com/copilot/test-generation \
+            > generated.json
+
+      - name: Write generated test files (Java)
+        run: java -cp target/classes com.example.tools.WriteGeneratedTests
+
+      - name: Commit & Push Generated Tests
+        run: |
+          git config user.email "copilot-bot@example.com"
+          git config user.name "Copilot Bot"
+          git add src/test/java || true
+          git commit -m "Auto-generated test cases by Copilot" || true
+          git push || true

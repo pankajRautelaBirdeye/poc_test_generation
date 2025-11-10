@@ -1,7 +1,8 @@
 package com.example.poc_test_generation.controller;
 
 
-import com.example.poc_test_generation.annotation.AutoTest;
+
+import com.example.poc_test_generation.annotation.AutoGenerateTest;
 import com.example.poc_test_generation.entity.User;
 import com.example.poc_test_generation.service.UserService;
 import org.springframework.web.bind.annotation.*;
@@ -14,7 +15,7 @@ public class UserController {
     public UserController(UserService userService) { this.userService = userService; }
 
     @PostMapping("/create")
-    @AutoTest("Generate full test")
+    @AutoGenerateTest("Generate full test")
     public User createUser(@RequestBody User user) {
         return userService.createUser(user);
     }
