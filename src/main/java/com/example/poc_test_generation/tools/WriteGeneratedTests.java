@@ -14,10 +14,11 @@ public class WriteGeneratedTests {
         ObjectMapper mapper = new ObjectMapper();
         JsonNode responses = mapper.readTree(new File("combined_output.json"));
 
-        // Pattern to extract java code block
+        // Regex to extract code inside ```java ... ```
         Pattern codeBlock = Pattern.compile("```java([\\s\\S]*?)```");
 
-        String outputDir = "src/test/java/generated";
+        // Output directory for generated tests
+        String outputDir = "src/test/java/com/example/poc_test_generation/generated";
         Files.createDirectories(Paths.get(outputDir));
 
         for (JsonNode response : responses) {
@@ -28,20 +29,28 @@ public class WriteGeneratedTests {
 
             String code = m.group(1).trim();
 
-            // Force package declaration
+            // Ensure package declaration
             if (!code.startsWith("package")) {
-                code = "package generated\n\n" + code;
+                code = "package com.example.poc_test_generation.generated;\n\n" + code;
             }
 
-            // Replace @Mock + @InjectMocks with @MockBean
-            code = code.replaceAll("@Mock\\s+private", "@MockBean private");
-            code = code.replaceAll("@InjectMocks\\s+private", "");
+            // Optional: ensure imports for Spring Boot @WebMvcTest
+            if (!code.contains("import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;")) {
+                String imports =
+                        "import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;\n" +
+                                "import org.springframework.boot.test.mock.mockito.MockBean;\n" +
+                                "import org.springframework.beans.factory.annotation.Autowired;\n" +
+                                "import org.springframework.test.web.servlet.MockMvc;\n" +
+                                "import com.fasterxml.jackson.databind.ObjectMapper;\n";
+                code = code.replaceFirst("package .*?;", "$0\n\n" + imports);
+            }
 
             // Get class name
             Matcher classMatcher = Pattern.compile("class\\s+(\\w+)").matcher(code);
             if (!classMatcher.find()) continue;
             String className = classMatcher.group(1);
 
+            // Write to file
             String path = outputDir + "/" + className + ".java";
             Files.writeString(Paths.get(path), code);
 
