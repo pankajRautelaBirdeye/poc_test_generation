@@ -106,3 +106,15 @@ jobs:
           git add src/test/java/com/example/poc_test_generation/generated || true
           git commit -m "✅ Auto-generated tests using OpenAI gpt-4o-mini" || true
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:${GITHUB_REF#refs/heads/}
+
+      # ----------------------------------------------------
+      # 10. Save JSON files into resources and commit
+      # ----------------------------------------------------
+      - name: Save JSON files to resources
+        run: |
+          mkdir -p src/main/resources/generated-json
+          mv methods.json src/main/resources/generated-json/methods.json
+          mv combined_output.json src/main/resources/generated-json/combined_output.json
+          git add src/main/resources/generated-json || true
+          git commit -m "💾 Save generated JSON files" || true
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:${GITHUB_REF#refs/heads/}
