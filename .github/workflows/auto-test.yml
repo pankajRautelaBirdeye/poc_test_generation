@@ -10,30 +10,54 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ----------------------------------------------------
+      # Checkout repository
+      # ----------------------------------------------------
       - uses: actions/checkout@v4
 
+      # ----------------------------------------------------
+      # Setup Java
+      # ----------------------------------------------------
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Install JavaParser
-        run: mvn dependency:resolve
-
-      - name: Build scanner
+      # ----------------------------------------------------
+      # Build project
+      # ----------------------------------------------------
+      - name: Build tools
         run: mvn -q -DskipTests package
 
+      # ----------------------------------------------------
+      # FIX: Build FULL Maven classpath (mandatory for Jackson, JavaParser, Spring)
+      # ----------------------------------------------------
+      - name: Build classpath
+        run: mvn -q -DincludeScope=runtime dependency:build-classpath -Dmdep.outputFile=cp.txt
+
+      # ----------------------------------------------------
+      # Run Scanner with FULL classpath
+      # ----------------------------------------------------
       - name: Scan project for annotated APIs
-        run: java -cp target/classes com.example.poc_test_generation.tools.ScanAnnotations
-
-      - name: Generate test cases using OpenAI
         run: |
-          jq -c '.[]' methods.json | while read method; do
-            echo "Processing method..."
-            BODY=$(jq -n --arg input "$method" '{input:$input}')
+          CP=$(cat cp.txt):target/classes
+          java -cp "$CP" com.example.poc_test_generation.tools.ScanAnnotations
 
-            curl https://api.openai.com/v1/responses \
+      - name: Print scanned metadata
+        run: cat methods.json || echo "methods.json missing!"
+
+      # ----------------------------------------------------
+      # Call OpenAI to generate test cases
+      # ----------------------------------------------------
+      - name: Generate Tests using OpenAI gpt-4o-mini
+        run: |
+          echo "[" > combined_output.json  # start array
+
+          jq -c '.[]' methods.json | while read method; do
+            echo "Generating test for method: $method"
+
+            RESPONSE=$(curl -s https://api.openai.com/v1/responses \
               -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
               -H "Content-Type: application/json" \
               -d "{
@@ -41,25 +65,42 @@ jobs:
                 \"input\": [
                   {
                     \"role\": \"system\",
-                    \"content\": \"You generate ONLY JUnit5 test classes. Return EXACTLY one Java code block.\"
+                    \"content\": \"You generate ONLY clean JUnit5 test classes. Return EXACTLY one \\\`\\\`\\\`java code block.\"
                   },
                   {
                     \"role\": \"user\",
-                    \"content\": $method
+                    \"content\": \"Generate test for this method metadata: $method\"
                   }
-                ]
-              }" > raw_output.json
+                ],
+                \"max_output_tokens\": 4096,
+                \"temperature\": 0.2
+              }")
 
-            cat raw_output.json >> combined_output.json
+            echo "$RESPONSE," >> combined_output.json  # append element
           done
 
-      - name: Write test files
-        run: java -cp target/classes com.example.poc_test_generation.tools.WriteGeneratedTests
+          sed -i '$ s/,$//' combined_output.json
+          echo "]" >> combined_output.json  # close array
 
+      - name: Print OpenAI combined output
+        run: cat combined_output.json
+
+      # ----------------------------------------------------
+      # Write generated test files (Java)
+      # ----------------------------------------------------
+      - name: Write generated test files
+        run: |
+          CP=$(cat cp.txt):target/classes
+          java -cp "$CP" com.example.poc_test_generation.tools.WriteGeneratedTests
+
+      # ----------------------------------------------------
+      # Commit and push generated test files
+      # ----------------------------------------------------
       - name: Commit & Push Generated Tests
         run: |
-          git config user.email "bot@example.com"
-          git config user.name "OpenAI Bot"
+          git config user.email "ai-test-bot@example.com"
+          git config user.name "AI Test Bot"
+
           git add src/test/java || true
-          git commit -m "✅ Auto-generated tests" || true
+          git commit -m "✅ Auto-generated tests using OpenAI gpt-4o-mini" || true
           git push || true
