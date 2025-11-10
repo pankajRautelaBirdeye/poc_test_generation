@@ -1,4 +1,4 @@
-package com.example.poc_test_generation.entity;
+package com.example.poc_test_generation.model;
 
 //@Entity
 public class User {

@@ -1,8 +1,6 @@
 package com.example.poc_test_generation.repository;
 
-import com.example.poc_test_generation.entity.User;
-
-import java.util.Optional;
+import com.example.poc_test_generation.model.User;
 
 
 public interface UserRepository {

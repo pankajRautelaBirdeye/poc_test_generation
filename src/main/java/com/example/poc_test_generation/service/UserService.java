@@ -1,6 +1,6 @@
 package com.example.poc_test_generation.service;
 
-import com.example.poc_test_generation.entity.User;
+import com.example.poc_test_generation.model.User;
 import com.example.poc_test_generation.repository.UserRepository;
 import org.springframework.stereotype.Service;
 

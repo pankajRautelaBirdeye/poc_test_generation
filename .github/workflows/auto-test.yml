@@ -91,7 +91,13 @@ jobs:
           java -cp "$CP" com.example.poc_test_generation.tools.WriteGeneratedTests
 
       # ----------------------------------------------------
-      # 8. Commit & Push generated tests to current branch
+      # 8. (Optional) Compile generated tests
+      # ----------------------------------------------------
+      - name: Compile Generated Tests
+        run: mvn clean compile test-compile
+
+      # ----------------------------------------------------
+      # 9. Commit & Push generated tests to current branch
       # ----------------------------------------------------
       - name: Commit & Push Generated Tests
         run: |

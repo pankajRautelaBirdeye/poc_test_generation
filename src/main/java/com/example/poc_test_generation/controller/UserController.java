@@ -3,7 +3,7 @@ package com.example.poc_test_generation.controller;
 
 
 import com.example.poc_test_generation.annotation.AutoGenerateTest;
-import com.example.poc_test_generation.entity.User;
+import com.example.poc_test_generation.model.User;
 import com.example.poc_test_generation.service.UserService;
 import org.springframework.web.bind.annotation.*;
 

@@ -1,6 +1,6 @@
 package com.example.poc_test_generation.repository;
 
-import com.example.poc_test_generation.entity.User;
+import com.example.poc_test_generation.model.User;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
