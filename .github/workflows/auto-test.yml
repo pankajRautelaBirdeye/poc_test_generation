@@ -2,7 +2,7 @@ name: Auto Test Generation (OpenAI)
 
 on:
   push:
-    branches: [ test_generation_v2 ]
+    branches: ["*"]
   workflow_dispatch:
 
 permissions:
