@@ -25,7 +25,7 @@ jobs:
         run: mvn -q -DskipTests package
 
       - name: Scan project for annotated APIs
-        run: java -cp target/classes com.example.tools.ScanAnnotations
+        run: java -cp target/classes com.example.poc_test_generation.tools.ScanAnnotations
 
       - name: Generate test cases using OpenAI
         run: |
@@ -54,7 +54,7 @@ jobs:
           done
 
       - name: Write test files
-        run: java -cp target/classes com.example.tools.WriteGeneratedTests
+        run: java -cp target/classes com.example.poc_test_generation.tools.WriteGeneratedTests
 
       - name: Commit & Push Generated Tests
         run: |
