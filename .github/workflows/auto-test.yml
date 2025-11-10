@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   generate-tests:
     runs-on: ubuntu-latest
@@ -12,12 +15,12 @@ jobs:
     steps:
 
       # ----------------------------------------------------
-      # 1. Checkout repository
+      # 1. Checkout repo
       # ----------------------------------------------------
       - uses: actions/checkout@v4
 
       # ----------------------------------------------------
-      # 2. Setup Java (required for scanner + writer)
+      # 2. Setup Java 17
       # ----------------------------------------------------
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -26,19 +29,19 @@ jobs:
           distribution: 'temurin'
 
       # ----------------------------------------------------
-      # 3. Build project (scanner + writer)
+      # 3. Build tools (scanner + writer)
       # ----------------------------------------------------
       - name: Build tools
         run: mvn -q -DskipTests package
 
       # ----------------------------------------------------
-      # 4. Build full Maven classpath (Jackson + JavaParser)
+      # 4. Build full Maven classpath
       # ----------------------------------------------------
       - name: Build classpath
         run: mvn -q -DincludeScope=runtime dependency:build-classpath -Dmdep.outputFile=cp.txt
 
       # ----------------------------------------------------
-      # 5. Run scanner with full classpath
+      # 5. Run Scanner using full classpath
       # ----------------------------------------------------
       - name: Scan project for annotated APIs
         run: |
@@ -46,11 +49,10 @@ jobs:
           java -cp "$CP" com.example.poc_test_generation.tools.ScanAnnotations
 
       - name: Print scanner output
-        run: cat methods.json || echo "❌ methods.json missing"
+        run: cat methods.json || echo "❌ methods.json missing!"
 
       # ----------------------------------------------------
-      # 6. Call OpenAI for each scanned method
-      #    ✅ FIXED: safe JSON using --arg
+      # 6. Generate tests using OpenAI (SAFE JSON)
       # ----------------------------------------------------
       - name: Generate Tests using OpenAI gpt-4o-mini
         run: |
@@ -59,7 +61,6 @@ jobs:
           jq -c '.[]' methods.json | while read method; do
             echo "📌 Generating test for method..."
 
-            # Build valid JSON using jq (safe string)
             REQUEST=$(jq -n \
               --arg method "$method" \
               '{
@@ -67,11 +68,11 @@ jobs:
                 input: [
                   {
                     "role": "system",
-                    "content": "You generate ONLY clean JUnit 5 test classes. Output exactly one ```java code block. Use @WebMvcTest, MockMvc, Mockito, and ObjectMapper."
+                    "content": "You generate ONLY clean JUnit5 test classes. Output exactly one ```java code block. Use @WebMvcTest, MockMvc, Mockito, and ObjectMapper."
                   },
                   {
                     "role": "user",
-                    "content": ("Generate a complete Spring Boot JUnit test for the following method metadata:\n\n" + $method)
+                    "content": ("Generate a complete production-grade Spring Boot JUnit test for the following:\n\n" + $method)
                   }
                 ],
                 max_output_tokens: 4096,
@@ -93,7 +94,7 @@ jobs:
         run: cat combined_output.json
 
       # ----------------------------------------------------
-      # 7. Write generated test files
+      # 7. Write test files using Java Writer
       # ----------------------------------------------------
       - name: Write generated test files
         run: |
@@ -101,7 +102,7 @@ jobs:
           java -cp "$CP" com.example.poc_test_generation.tools.WriteGeneratedTests
 
       # ----------------------------------------------------
-      # 8. Commit & Push generated test files
+      # 8. Commit & Push tests using GITHUB_TOKEN
       # ----------------------------------------------------
       - name: Commit & Push Generated Tests
         run: |
@@ -110,4 +111,5 @@ jobs:
 
           git add src/test/java || true
           git commit -m "✅ Auto-generated tests using OpenAI gpt-4o-mini" || true
-          git push || true
+
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:main
