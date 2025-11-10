@@ -1,0 +1,6 @@
+[ {
+  "sourceCode" : "@PostMapping(\"/create\")\n@AutoGenerateTest(\"Generate full test\")\npublic User createUser(@RequestBody User user) {\n    return userService.createUser(user);\n}",
+  "mapping" : "@PostMapping(\"/create\")",
+  "methodName" : "createUser",
+  "className" : "UserController"
+} ]

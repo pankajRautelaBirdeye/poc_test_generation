@@ -1,0 +1,70 @@
+[
+{
+  "id": "resp_05c4e4a4066a0930006911c4746524819e97a5a36f14fb440b",
+  "object": "response",
+  "created_at": 1762772084,
+  "status": "completed",
+  "background": false,
+  "billing": {
+    "payer": "developer"
+  },
+  "error": null,
+  "incomplete_details": null,
+  "instructions": null,
+  "max_output_tokens": 4096,
+  "max_tool_calls": null,
+  "model": "gpt-4o-mini-2024-07-18",
+  "output": [
+    {
+      "id": "msg_05c4e4a4066a0930006911c4750a70819e825f8b921e32d5a8",
+      "type": "message",
+      "status": "completed",
+      "content": [
+        {
+          "type": "output_text",
+          "annotations": [],
+          "logprobs": [],
+          "text": "```java\npackage com.example.poc_test_generation.generated;\n\nimport com.example.poc_test_generation.controller.UserController;\nimport com.example.poc_test_generation.model.User;\nimport com.example.poc_test_generation.service.UserService;\nimport com.fasterxml.jackson.databind.ObjectMapper;\nimport org.junit.jupiter.api.BeforeEach;\nimport org.junit.jupiter.api.Test;\nimport org.mockito.Mockito;\nimport org.springframework.beans.factory.annotation.Autowired;\nimport org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;\nimport org.springframework.boot.test.mock.mockito.MockBean;\nimport org.springframework.http.MediaType;\nimport org.springframework.test.web.servlet.MockMvc;\n\nimport static org.mockito.ArgumentMatchers.any;\nimport static org.mockito.Mockito.when;\nimport static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;\nimport static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;\nimport static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;\n\n@WebMvcTest(UserController.class)\npublic class UserControllerTest {\n\n    @Autowired\n    private MockMvc mockMvc;\n\n    @Autowired\n    private ObjectMapper objectMapper;\n\n    @MockBean\n    private UserService userService;\n\n    private User user;\n\n    @BeforeEach\n    public void setUp() {\n        user = new User();\n        user.setId(1L);\n        user.setName(\"John Doe\");\n        user.setEmail(\"john.doe@example.com\");\n    }\n\n    @Test\n    public void createUser_ShouldReturnCreatedUser() throws Exception {\n        when(userService.createUser(any(User.class))).thenReturn(user);\n\n        mockMvc.perform(post(\"/create\")\n                .contentType(MediaType.APPLICATION_JSON)\n                .content(objectMapper.writeValueAsString(user)))\n                .andExpect(status().isOk())\n                .andExpect(jsonPath(\"$.id\").value(user.getId()))\n                .andExpect(jsonPath(\"$.name\").value(user.getName()))\n                .andExpect(jsonPath(\"$.email\").value(user.getEmail()));\n    }\n}\n```"
+        }
+      ],
+      "role": "assistant"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "prompt_cache_key": null,
+  "prompt_cache_retention": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "safety_identifier": null,
+  "service_tier": "default",
+  "store": true,
+  "temperature": 0.2,
+  "text": {
+    "format": {
+      "type": "text"
+    },
+    "verbosity": "medium"
+  },
+  "tool_choice": "auto",
+  "tools": [],
+  "top_logprobs": 0,
+  "top_p": 1.0,
+  "truncation": "disabled",
+  "usage": {
+    "input_tokens": 152,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 390,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 542
+  },
+  "user": null,
+  "metadata": {}
+}
+]
