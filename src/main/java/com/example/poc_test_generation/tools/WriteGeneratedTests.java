@@ -30,7 +30,7 @@ public class WriteGeneratedTests {
 
             // Force package declaration
             if (!code.startsWith("package")) {
-                code = "package com.example.demo.generated;\n\n" + code;
+                code = "com.example.poc_test_generation;\n\n" + code;
             }
 
             // Replace @Mock + @InjectMocks with @MockBean
