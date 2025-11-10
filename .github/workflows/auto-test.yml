@@ -10,82 +10,81 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # -------------------------------
-      # Checkout code
-      # -------------------------------
+      # ----------------------------------------------------
+      # Checkout Code
+      # ----------------------------------------------------
       - uses: actions/checkout@v4
 
-      # -------------------------------
-      # Setup Java
-      # -------------------------------
+      # ----------------------------------------------------
+      # Setup Java 17
+      # ----------------------------------------------------
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # -------------------------------
-      # Build project (scanner + writer classes)
-      # -------------------------------
-      - name: Build classes
+      # ----------------------------------------------------
+      # Build project (scanner + writer)
+      # ----------------------------------------------------
+      - name: Build tools
         run: mvn -q -DskipTests package
 
-      # -------------------------------
-      # Build Maven classpath (includes Jackson)
-      # -------------------------------
+      # ----------------------------------------------------
+      # Build Maven classpath (Jackson + Spring)
+      # ----------------------------------------------------
       - name: Build classpath
         run: mvn -q -DincludeScope=runtime dependency:build-classpath -Dmdep.outputFile=cp.txt
 
-      # -------------------------------
-      # Run Annotation Scanner (Java)
-      # -------------------------------
+      # ----------------------------------------------------
+      # Run Java Annotation Scanner
+      # ----------------------------------------------------
       - name: Scan for annotated APIs
         run: |
           CP=$(cat cp.txt):target/classes
           java -cp "$CP" com.example.poc_test_generation.tools.ScanAnnotations > methods.json
 
-      - name: Print methods.json
+      - name: Print scanned metadata
         run: cat methods.json
 
-      # -------------------------------
-      # Call GitHub Copilot Chat API
-      # -------------------------------
-      - name: Generate Tests using GitHub Copilot Chat API
+      # ----------------------------------------------------
+      # Generate JUnit tests using OpenAI gpt-4o-mini
+      # ----------------------------------------------------
+      - name: Generate Tests using OpenAI gpt-4o-mini
         run: |
-          echo "Calling Copilot Chat API..."
-          curl -s -X POST https://api.github.com/copilot/chat/completions \
-            -H "Authorization: Bearer ${{ secrets.GH_COPILOT_TOKEN }}" \
+          echo "Calling OpenAI gpt-4o-mini..."
+          curl -s -X POST "https://api.openai.com/v1/responses" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -d "$(jq -n \
                   --arg methods "$(cat methods.json)" \
                   '{
-                    model: "gpt-4o-copilot",
-                    messages: [
-                      {role: "system", content: "You generate JUnit tests."},
-                      {role: "user", content: ("Generate JUnit tests for: " + $methods)}
-                    ]
+                    model: "gpt-4o-mini",
+                    input: ("Generate clean, production-quality JUnit test classes using Spring Boot, WebMvcTest, MockMvc, Mockito. Use this metadata: " + $methods),
+                    max_output_tokens: 4096,
+                    temperature: 0.1
                   }')" \
             > generated.json
 
-      - name: Print Copilot Response
+      - name: Print OpenAI response
         run: cat generated.json
 
-      # -------------------------------
-      # Write Test Files (Java writer)
-      # -------------------------------
+      # ----------------------------------------------------
+      # Write test files using Java writer
+      # ----------------------------------------------------
       - name: Write generated test files
         run: |
           CP=$(cat cp.txt):target/classes
           java -cp "$CP" com.example.poc_test_generation.tools.WriteGeneratedTests
 
-      # -------------------------------
-      # Commit & Push Test Files
-      # -------------------------------
+      # ----------------------------------------------------
+      # Commit & push test files back to repo
+      # ----------------------------------------------------
       - name: Commit & Push Generated Tests
         run: |
-          git config user.email "copilot-bot@example.com"
-          git config user.name "Copilot Bot"
+          git config user.email "ai-test-bot@example.com"
+          git config user.name "AI Test Bot"
 
           git add src/test/java || true
-          git commit -m "Auto-generated test cases by Copilot Chat API" || true
+          git commit -m "Auto-generated JUnit tests using OpenAI gpt-4o-mini" || true
           git push || true
