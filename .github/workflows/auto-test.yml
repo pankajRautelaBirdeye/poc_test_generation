@@ -10,51 +10,68 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # -------------------------------
+      # Checkout code
+      # -------------------------------
       - uses: actions/checkout@v4
 
+      # -------------------------------
+      # Setup Java
+      # -------------------------------
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build tools
+      # -------------------------------
+      # Build project (scanner + writer classes)
+      # -------------------------------
+      - name: Build classes
         run: mvn -q -DskipTests package
 
       # -------------------------------
-      # Build full classpath (fix for Jackson missing)
+      # Build Maven classpath (includes Jackson)
       # -------------------------------
       - name: Build classpath
         run: mvn -q -DincludeScope=runtime dependency:build-classpath -Dmdep.outputFile=cp.txt
 
       # -------------------------------
-      # Run annotation scanner (Java)
+      # Run Annotation Scanner (Java)
       # -------------------------------
       - name: Scan for annotated APIs
         run: |
           CP=$(cat cp.txt):target/classes
           java -cp "$CP" com.example.poc_test_generation.tools.ScanAnnotations > methods.json
 
-      - name: Print detected APIs
+      - name: Print methods.json
         run: cat methods.json
 
       # -------------------------------
-      # Call Copilot Test Generation API
+      # Call GitHub Copilot Chat API
       # -------------------------------
-      - name: Call GitHub Copilot Test Generation API
+      - name: Generate Tests using GitHub Copilot Chat API
         run: |
-          curl -s -X POST \
+          echo "Calling Copilot Chat API..."
+          curl -s -X POST https://api.github.com/copilot/chat/completions \
             -H "Authorization: Bearer ${{ secrets.GH_COPILOT_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d @methods.json \
-            https://api.github.com/copilot/test-generation \
+            -d "$(jq -n \
+                  --arg methods "$(cat methods.json)" \
+                  '{
+                    model: "gpt-4o-copilot",
+                    messages: [
+                      {role: "system", content: "You generate JUnit tests."},
+                      {role: "user", content: ("Generate JUnit tests for: " + $methods)}
+                    ]
+                  }')" \
             > generated.json
 
-      - name: Show Copilot Output
+      - name: Print Copilot Response
         run: cat generated.json
 
       # -------------------------------
-      # Run Java writer to create test files
+      # Write Test Files (Java writer)
       # -------------------------------
       - name: Write generated test files
         run: |
@@ -62,7 +79,7 @@ jobs:
           java -cp "$CP" com.example.poc_test_generation.tools.WriteGeneratedTests
 
       # -------------------------------
-      # Commit & push generated tests
+      # Commit & Push Test Files
       # -------------------------------
       - name: Commit & Push Generated Tests
         run: |
@@ -70,5 +87,5 @@ jobs:
           git config user.name "Copilot Bot"
 
           git add src/test/java || true
-          git commit -m "Auto-generated test cases by Copilot" || true
+          git commit -m "Auto-generated test cases by Copilot Chat API" || true
           git push || true
