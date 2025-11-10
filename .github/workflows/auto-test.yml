@@ -10,13 +10,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       # ----------------------------------------------------
-      # Checkout repository
+      # 1. Checkout code
       # ----------------------------------------------------
       - uses: actions/checkout@v4
 
       # ----------------------------------------------------
-      # Setup Java
+      # 2. Setup Java 17
       # ----------------------------------------------------
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -25,68 +26,76 @@ jobs:
           distribution: 'temurin'
 
       # ----------------------------------------------------
-      # Build project
+      # 3. Build project (scanner + writer classes)
       # ----------------------------------------------------
       - name: Build tools
         run: mvn -q -DskipTests package
 
       # ----------------------------------------------------
-      # FIX: Build FULL Maven classpath (mandatory for Jackson, JavaParser, Spring)
+      # 4. Build full Maven classpath for Jackson + JavaParser
       # ----------------------------------------------------
       - name: Build classpath
         run: mvn -q -DincludeScope=runtime dependency:build-classpath -Dmdep.outputFile=cp.txt
 
       # ----------------------------------------------------
-      # Run Scanner with FULL classpath
+      # 5. Run scanner (JavaParser + Jackson) with full classpath
       # ----------------------------------------------------
       - name: Scan project for annotated APIs
         run: |
           CP=$(cat cp.txt):target/classes
           java -cp "$CP" com.example.poc_test_generation.tools.ScanAnnotations
 
-      - name: Print scanned metadata
-        run: cat methods.json || echo "methods.json missing!"
+      - name: Print scanner output
+        run: cat methods.json
 
       # ----------------------------------------------------
-      # Call OpenAI to generate test cases
+      # 6. Call OpenAI for each annotated API
+      #    FIXED: safe JSON via jq --argjson
       # ----------------------------------------------------
       - name: Generate Tests using OpenAI gpt-4o-mini
         run: |
-          echo "[" > combined_output.json  # start array
+          echo "[" > combined_output.json
 
           jq -c '.[]' methods.json | while read method; do
             echo "Generating test for method: $method"
 
+            # Build valid JSON request using jq
+            REQUEST=$(jq -n \
+              --argjson method "$method" \
+              '{
+                model: "gpt-4o-mini",
+                input: [
+                  {
+                    "role": "system",
+                    "content": "You generate ONLY one JUnit5 test class. Return EXACTLY one ```java code block. Use @WebMvcTest, MockMvc, ObjectMapper, Mockito."
+                  },
+                  {
+                    "role": "user",
+                    "content": ("Generate complete Spring Boot JUnit tests for the following method:\n\n" + ($method | tostring))
+                  }
+                ],
+                max_output_tokens: 4096,
+                temperature: 0.2
+              }')
+
+            # Call OpenAI
             RESPONSE=$(curl -s https://api.openai.com/v1/responses \
               -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
               -H "Content-Type: application/json" \
-              -d "{
-                \"model\": \"gpt-4o-mini\",
-                \"input\": [
-                  {
-                    \"role\": \"system\",
-                    \"content\": \"You generate ONLY clean JUnit5 test classes. Return EXACTLY one \\\`\\\`\\\`java code block.\"
-                  },
-                  {
-                    \"role\": \"user\",
-                    \"content\": \"Generate test for this method metadata: $method\"
-                  }
-                ],
-                \"max_output_tokens\": 4096,
-                \"temperature\": 0.2
-              }")
+              -d "$REQUEST")
 
-            echo "$RESPONSE," >> combined_output.json  # append element
+            echo "$RESPONSE," >> combined_output.json
           done
 
+          # Remove trailing comma and close JSON array
           sed -i '$ s/,$//' combined_output.json
-          echo "]" >> combined_output.json  # close array
+          echo "]" >> combined_output.json
 
-      - name: Print OpenAI combined output
+      - name: Print combined OpenAI output
         run: cat combined_output.json
 
       # ----------------------------------------------------
-      # Write generated test files (Java)
+      # 7. Write generated test files
       # ----------------------------------------------------
       - name: Write generated test files
         run: |
@@ -94,7 +103,7 @@ jobs:
           java -cp "$CP" com.example.poc_test_generation.tools.WriteGeneratedTests
 
       # ----------------------------------------------------
-      # Commit and push generated test files
+      # 8. Commit & push tests
       # ----------------------------------------------------
       - name: Commit & Push Generated Tests
         run: |
